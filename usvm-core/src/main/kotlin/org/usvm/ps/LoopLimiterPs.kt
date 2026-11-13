@@ -45,7 +45,7 @@ class LoopLimiterPs<Stmt, Method, Loop : Any, State : UState<*, Method, Stmt, *,
             logger.debug {
                 "Drop state ${state.id} | iteration limit exceeded $iterations at ${state.lastEnteredMethod} ${state.currentStatement}"
             }
-            return
+            throw org.usvm.CxExplorationIncompleteException("loop_iteration_limit")
         }
 
         stateStats[state] = stats

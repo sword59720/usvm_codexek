@@ -56,7 +56,7 @@ class IterativeDeepeningPs<Stmt, Method, Loop : Any, State : UState<*, Method, S
         val iterations = stats.maxLoopIteration
         if (iterationLimit != null && iterations > iterationLimit) {
             logger.debug { "Drop state ${state.id} | iteration limit exceeded $iterations" }
-            return
+            throw org.usvm.CxExplorationIncompleteException("loop_iteration_limit")
         }
 
         stateStats[state] = stats

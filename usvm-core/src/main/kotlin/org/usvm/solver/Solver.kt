@@ -39,17 +39,19 @@ open class USolverBase<Type>(
 ) : USolver<UPathConstraints<Type>, UModelBase<Type>>(), AutoCloseable {
 
     override fun check(query: UPathConstraints<Type>): USolverResult<UModelBase<Type>> =
-        internalCheck(query, softConstraints = emptyList())
+        internalCheck(query, softConstraints = emptyList()).also { if (it is UUnknownResult) throw CxSolverUnknownException() }
 
     fun checkWithSoftConstraints(
         pc: UPathConstraints<Type>,
         softConstraints: Iterable<UBoolExpr>
-    ): USolverResult<UModelBase<Type>> = internalCheck(pc, softConstraints)
+    ): USolverResult<UModelBase<Type>> = internalCheck(pc, softConstraints).also { if (it is UUnknownResult) throw CxSolverUnknownException() }
 
     private fun internalCheck(
         pc: UPathConstraints<Type>,
         softConstraints: Iterable<UBoolExpr>,
     ): USolverResult<UModelBase<Type>> {
+        val checkStarted = System.nanoTime()
+        fun expired() = timeout.isFinite() && System.nanoTime() - checkStarted >= timeout.inWholeNanoseconds
         if (pc.isFalse) {
             return UUnsatResult()
         }
@@ -68,10 +70,13 @@ open class USolverBase<Type>(
             var iter = 0
             @Suppress("KotlinConstantConditions")
             do {
+                if (expired()) return UUnknownResult()
                 iter++
 
                 // first, get a model from the SMT solver
-                val kModel = when (internalCheckWithSoftConstraints(translatedSoftConstraints)) {
+                val status = internalCheckWithSoftConstraints(translatedSoftConstraints, ::expired)
+                if (expired()) return UUnknownResult()
+                val kModel = when (status) {
                     KSolverStatus.SAT -> smtSolver.model().detach()
                     KSolverStatus.UNSAT -> return UUnsatResult()
                     KSolverStatus.UNKNOWN -> return UUnknownResult()
@@ -125,12 +130,15 @@ open class USolverBase<Type>(
 
     private fun internalCheckWithSoftConstraints(
         softConstraints: MutableList<UBoolExpr>,
+        expired: () -> Boolean,
     ): KSolverStatus {
+        if (expired()) return KSolverStatus.UNKNOWN
         var status: KSolverStatus
         if (softConstraints.isNotEmpty()) {
             status = smtSolver.checkWithAssumptions(softConstraints, timeout)
 
             while (status == KSolverStatus.UNSAT) {
+                if (expired()) return KSolverStatus.UNKNOWN
                 val unsatCore = smtSolver.unsatCore().toHashSet()
                 if (unsatCore.isEmpty()) break
                 softConstraints.removeAll { it in unsatCore }

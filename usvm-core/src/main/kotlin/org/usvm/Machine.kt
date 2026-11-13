@@ -46,6 +46,17 @@ abstract class UMachine<State : UState<*, *, *, *, *, State>> : AutoCloseable {
                     val (forkedStates, stateAlive) = try {
                         interpreter.step(state)
                     } catch (e: Throwable) {
+                        if (e is org.usvm.CxStepDiscard) {
+                            // v4: an unmodeled effect cannot advance THIS state
+                            // soundly - discard it, keep every other state and
+                            // entry point running, and expose the site through
+                            // the JVM audit log. Finite exploration stays explicit.
+                            logger.error(e) { "Step discarded: unknown side effect" }
+                            observer.onState(state, forks = emptySequence())
+                            pathSelector.remove(state)
+                            observer.onStateTerminated(state, stateReachable = false)
+                            continue
+                        }
                         if (options.throwExceptionOnStepFailure) {
                             throw e
                         }
@@ -92,7 +103,7 @@ abstract class UMachine<State : UState<*, *, *, *, *, State>> : AutoCloseable {
 
             if (!pathSelector.isEmpty()) {
                 val stopReason = stopStrategy.stopReason()
-                logger.debug { stopReason }
+                throw CxExplorationIncompleteException(stopReason)
             }
         }
     }

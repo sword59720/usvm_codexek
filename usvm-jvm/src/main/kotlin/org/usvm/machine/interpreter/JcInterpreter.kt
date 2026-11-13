@@ -274,7 +274,7 @@ class JcInterpreter(
                 val entryPoint = applicationGraph.entryPoints(method).singleOrNull()
 
                 if (method.isNative || entryPoint == null) {
-                    mockMethod(scope, stmt, applicationGraph)
+                    org.usvm.machine.CxAuditLog.record("unmodeled_mock:" + stmt); throw org.usvm.machine.CxUnknownSideEffectException(stmt.toString())
                     return
                 }
 
@@ -324,7 +324,7 @@ class JcInterpreter(
                     return
                 }
 
-                mockMethod(scope, stmt, stmt.dynamicCall.callSiteReturnType)
+                org.usvm.machine.CxAuditLog.record("unmodeled_mock:" + stmt); throw org.usvm.machine.CxUnknownSideEffectException(stmt.toString())
             }
         }
     }

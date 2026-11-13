@@ -240,12 +240,10 @@ class JcMethodApproximationResolver(
             if (method.enclosingClass.declaration.location.isRuntime) {
                 /**
                  * Native methods in the standard library with no return value and no
-                 * arguments have no visible effect and can be skipped
+                 * arguments are not assumed side-effect free by the P0 adapter
                  * */
-                scope.doWithState {
-                    skipMethodInvocationWithValue(methodCall, ctx.voidValue)
-                }
-                return true
+                org.usvm.machine.CxAuditLog.record("unverified_runtime_native:" + method)
+                throw org.usvm.machine.CxUnknownSideEffectException("unverified_runtime_native:" + method)
             }
         }
 
