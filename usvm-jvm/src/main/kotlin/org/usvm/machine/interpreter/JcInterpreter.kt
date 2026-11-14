@@ -644,7 +644,7 @@ class JcInterpreter(
             ::classInitializerAlwaysAnalysisRequiredForType
         )
 
-    private val localVarToIdx = mutableMapOf<JcMethod, MutableMap<String, Int>>() // (method, localName) -> idx
+    private val localVarToIdx = mutableMapOf<JcMethod, MutableMap<Int, Int>>() // (method, tacRegisterIdx) -> idx
 
     // TODO: now we need to explicitly evaluate indices of registers, because we don't have specific ULValues
     private fun mapLocalToIdxMapper(method: JcMethod, local: JcImmediate) =
@@ -652,7 +652,15 @@ class JcInterpreter(
             is JcLocalVar -> localVarToIdx
                 .getOrPut(method) { mutableMapOf() }
                 .run {
-                    getOrPut(local.name) { method.parametersWithThisCount + size }
+                    // Key by the TAC register INDEX, not the debug name: one
+                    // jacodb register can carry different names on different
+                    // occurrences (a merged local is "v" on its assignments
+                    // and "%<idx>" on a use — fillRegisterNames renames
+                    // assignment LHS only). Name-keying split one register
+                    // into two, so a use read a never-written register and
+                    // the analysis invented a free symbolic for it (unsound
+                    // null-model false positives).
+                    getOrPut(local.index) { method.parametersWithThisCount + size }
                 }
 
             is JcThis -> 0
